@@ -1,6 +1,5 @@
 import os
 import subprocess
-import shutil
 from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,51 +22,51 @@ def day_hang_phuc_hoi():
     repo_url = data.get("LINK_GITHUB")
     token = data.get("TOKEN_ACCESS")
     branch = data.get("BRANCH_NAME", "main")
-    path_scraper = data.get("PATH_SCRAPER")
-    path_shopee = data.get("PATH_SHOPEE")
+    
+    # Lấy đường dẫn và dọn dẹp các ký tự thừa
+    path_scraper = data.get("PATH_SCRAPER").strip('"')
+    path_shopee = data.get("PATH_SHOPEE").strip('"')
+    
+    # Dùng Token để tự động đăng nhập, không hiện bảng Sign In nữa
     final_url = repo_url.replace("https://", f"https://{token}@")
 
     try:
         os.chdir(BASE_DIR)
         
-        # Thử làm sạch nếu có thể, nếu bị Windows chặn thì bỏ qua để chạy tiếp
-        dot_git = os.path.join(BASE_DIR, ".git")
-        if os.path.exists(dot_git):
-            try:
-                shutil.rmtree(dot_git)
-                print("🧹 Đã dọn dẹp xong bộ nhớ cũ.")
-            except:
-                print("⚠️ Đang cập nhật trực tiếp vào bộ nhớ hiện tại...")
-
-        # Khởi tạo lại Git (lệnh này sẽ tự sửa lỗi nếu chưa có .git)
+        # Khởi tạo lại để sạch sẽ
         subprocess.run(["git", "init"], capture_output=True)
-        
-        # Cập nhật địa chỉ gửi hàng
         subprocess.run(["git", "remote", "remove", "origin"], capture_output=True)
         subprocess.run(["git", "remote", "add", "origin", final_url], check=True)
 
-        print("🎯 Đang chọn đúng 2 thư mục dữ liệu Shopee...")
-        # CHỈ THÊM 2 THƯ MỤC DATA, KHÔNG THÊM CẢ MÁY TÍNH
-        if path_scraper and os.path.exists(path_scraper):
-            subprocess.run(["git", "add", f'"{path_scraper}"'], shell=True)
-        if path_shopee and os.path.exists(path_shopee):
-            subprocess.run(["git", "add", f'"{path_shopee}"'], shell=True)
+        print("🎯 Đang tìm 2 thư mục dữ liệu...")
         
-        # Thêm file code này
-        subprocess.run(["git", "add", "bot_shopee.py"], capture_output=True)
+        # Thêm thư mục cẩn thận hơn
+        co_du_lieu = False
+        if os.path.exists(path_scraper):
+            subprocess.run(["git", "add", "."], cwd=path_scraper) # Thêm file từ thư mục scraper
+            co_du_lieu = True
+        if os.path.exists(path_shopee):
+            subprocess.run(["git", "add", "."], cwd=path_shopee) # Thêm file từ thư mục shopee
+            co_du_lieu = True
+            
+        if not co_du_lieu:
+            print("❌ Chú ơi, đường dẫn trong config.txt hình như bị sai, máy không thấy thư mục nào cả!")
+            return
 
+        subprocess.run(["git", "add", "bot_shopee.py"], capture_output=True)
         subprocess.run(["git", "branch", "-M", branch], check=True)
         
         time_now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        subprocess.run(["git", "commit", "-m", f"Cap nhat data: {time_now}"], capture_output=True)
+        subprocess.run(["git", "commit", "-m", f"Cap nhat: {time_now}"], capture_output=True)
 
-        print("🚀 Đang đẩy dữ liệu sạch lên GitHub...")
+        print("🚀 Đang tự động đăng nhập và gửi dữ liệu...")
+        # Lệnh này sẽ dùng Token để đi thẳng vào GitHub
         result = subprocess.run([
-            "git", "push", "-f", "--push-option=allow-unsafe", "-u", "origin", branch
+            "git", "push", "-f", "-u", "origin", branch
         ], capture_output=True, text=True)
 
         if result.returncode == 0:
-            print("\n✅ THÀNH CÔNG! Chỉ có 2 thư mục dữ liệu trên GitHub.")
+            print("\n✅ THÀNH CÔNG RỒI CHÚ NAM!")
         else:
             print(f"❌ LỖI: {result.stderr}")
 
