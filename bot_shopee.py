@@ -17,49 +17,54 @@ def doc_cau_hinh():
 
 def day_hang_phuc_hoi():
     data = doc_cau_hinh()
-    if not data: return
+    if not data: 
+        print("❌ LỖI: Không tìm thấy file config.txt")
+        return
 
-    repo_url = data["LINK_GITHUB"]
-    token = data["TOKEN_ACCESS"]
+    # Thông tin từ hình ảnh GitHub của chú
+    token = data.get("TOKEN_ACCESS")
     branch = data.get("BRANCH_NAME", "main")
     
-    # Ép dùng Token để đăng nhập không cần hiện bảng
-    final_url = repo_url.replace("https://", f"https://{token}@")
+    # Tạo URL bảo mật dùng Token để không bị hỏi mật khẩu (Lỗi /dev/tty)
+    # Cấu trúc: https://<token>@github.com/namnguyen7133-png/minhmangthuocngam.git
+    final_url = f"https://{token}@github.com/namnguyen7133-png/minhmangthuocngam.git"
 
     try:
         os.chdir(BASE_DIR)
         
-        # Cấu hình Git dùng Token để không hỏi mật khẩu
-        subprocess.run(["git", "config", "--local", "credential.helper", ""], capture_output=True)
+        # Thiết lập môi trường không tương tác để chặn mọi hộp thoại hỏi mật khẩu
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "0"
         
         if not os.path.exists(os.path.join(BASE_DIR, ".git")):
-            subprocess.run(["git", "init"], capture_output=True)
+            subprocess.run(["git", "init"], capture_output=True, env=env)
         
-        subprocess.run(["git", "remote", "remove", "origin"], capture_output=True)
-        subprocess.run(["git", "remote", "add", "origin", final_url], check=True)
+        # Làm sạch remote cũ để nạp URL mới có chứa Token
+        subprocess.run(["git", "remote", "remove", "origin"], capture_output=True, env=env)
+        subprocess.run(["git", "remote", "add", "origin", final_url], check=True, env=env)
 
         print("📦 Đang chọn đúng 2 thư mục dữ liệu...")
-        # Lấy đường dẫn từ file config của chú
-        p1 = data["PATH_SCRAPER"]
-        p2 = data["PATH_SHOPEE"]
+        p1 = data.get("PATH_SCRAPER")
+        p2 = data.get("PATH_SHOPEE")
 
-        # Chỉ thêm đúng 2 thư mục này
-        subprocess.run(f'git add "{p1}"', shell=True)
-        subprocess.run(f'git add "{p2}"', shell=True)
-        subprocess.run(["git", "add", "bot_shopee.py"], capture_output=True)
+        if p1: subprocess.run(f'git add "{p1}"', shell=True, env=env)
+        if p2: subprocess.run(f'git add "{p2}"', shell=True, env=env)
+        subprocess.run(["git", "add", "bot_shopee.py"], capture_output=True, env=env)
 
-        subprocess.run(["git", "branch", "-M", branch], check=True)
+        subprocess.run(["git", "branch", "-M", branch], check=True, env=env)
         
         time_now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        subprocess.run(["git", "commit", "-m", f"Data Update: {time_now}"], capture_output=True)
+        subprocess.run(["git", "commit", "-m", f"Data Update: {time_now}"], capture_output=True, env=env)
 
-        print("🚀 Đang gửi dữ liệu (không cần đăng nhập tay)...")
-        # Lệnh quan trọng để ép GitHub nhận Token
-        result = subprocess.run(["git", "push", "-f", "origin", branch], capture_output=True, text=True)
+        print("🚀 Đang gửi dữ liệu lên GitHub...")
+        # Lệnh ép đẩy dữ liệu (Force Push) kèm theo môi trường đã cấu hình
+        result = subprocess.run(["git", "push", "-u", "-f", "origin", branch], capture_output=True, text=True, env=env)
 
         if result.returncode == 0:
-            print("\n✅ THÀNH CÔNG RỒI CHÚ NAM! Dữ liệu 32 shop đã lên mạng.")
+            print(f"\n✅ THÀNH CÔNG RỒI CHÚ NAM!")
+            print(f"Dữ liệu đã lên: https://github.com/namnguyen7133-png/minhmangthuocngam")
         else:
+            # Nếu lỗi, kiểm tra xem Token có đúng quyền 'workflow' và 'repo' không
             print(f"❌ LỖI: {result.stderr}")
 
     except Exception as e:
